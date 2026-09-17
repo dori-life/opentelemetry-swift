@@ -776,8 +776,8 @@ public final class URLSessionInstrumentation: @unchecked Sendable {
     setIdKey(value: taskId, for: downloadTask)
   }
 
-  private func urlSession(_ session: URLSession, task: URLSessionTask,
-                          didFinishCollecting metrics: URLSessionTaskMetrics) {
+  fileprivate func urlSession(_ session: URLSession, task: URLSessionTask,
+                              didFinishCollecting metrics: URLSessionTaskMetrics) {
     guard let taskId = objc_getAssociatedObject(task, &idKey) as? String else {
       return
     }
@@ -954,6 +954,20 @@ final class AsyncTaskDelegate: NSObject, URLSessionTaskDelegate, @unchecked Send
     self.instrumentation = instrumentation
     self.sessionTaskId = sessionTaskId
     super.init()
+  }
+
+  /// Foundation delivers this, and not `didCompleteWithError`, to a task delegate attached to
+  /// a delegate-less async `URLSession` task (`data(for:)`, `upload(for:from:)`, `bytes(for:)`).
+  /// Without it the span opened in `urlSessionTaskWillResume` is only ended when the delegate
+  /// class happens to have been swept by the autodetecting class scan, so an explicit
+  /// `delegateClassesToInstrument` inventory silently leaks one running span per async request.
+  ///
+  /// Forwards to the instrumentation's own handler rather than duplicating
+  /// `didCompleteWithError`'s body: that handler also clears the `requestMap` entry
+  /// `urlSessionTaskWillResume` created, which `didCompleteWithError` does not.
+  func urlSession(_ session: URLSession, task: URLSessionTask,
+                  didFinishCollecting metrics: URLSessionTaskMetrics) {
+    instrumentation?.urlSession(session, task: task, didFinishCollecting: metrics)
   }
 
   func urlSession(_ session: URLSession, task: URLSessionTask,
