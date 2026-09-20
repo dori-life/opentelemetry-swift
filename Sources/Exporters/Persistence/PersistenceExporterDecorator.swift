@@ -100,7 +100,7 @@ final class PersistenceExporterDecorator<T>: Sendable
     data.append(JSONDataConstants.arraySeparator)
 
     if performancePreset.synchronousWrite {
-      fileWriter.writeSync(data: data)
+      try fileWriter.writeSync(data: data)
     } else {
       fileWriter.write(data: data)
     }

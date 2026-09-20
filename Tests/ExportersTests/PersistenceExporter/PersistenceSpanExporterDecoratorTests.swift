@@ -133,6 +133,33 @@ class PersistenceSpanExporterDecoratorTests: XCTestCase {
     XCTAssertEqual(exportAttempts, 2, "Expected 2 export attempts (1 failure + 1 retry)")
   }
 
+  func testWhenSynchronousPersistenceFails_thenExportReturnsFailure() throws {
+    let mockSpanExporter = SpanExporterMock(onExport: { _, _ in
+      XCTFail("The decorated exporter must not run without durable persistence")
+      return .success
+    })
+    let persistenceSpanExporter = PersistenceSpanExporterDecorator(
+      spanExporter: mockSpanExporter,
+      storageURL: temporaryDirectory.url,
+      performancePreset: PersistencePerformancePreset.mockWith(
+        storagePerformance: StoragePerformanceMock(
+          maxFileSize: .max,
+          maxDirectorySize: .max,
+          maxFileAgeForWrite: .distantFuture,
+          minFileAgeForRead: .mockAny(),
+          maxFileAgeForRead: .mockAny(),
+          maxObjectsInFile: .max,
+          maxObjectSize: 0
+        ),
+        synchronousWrite: true,
+        exportPerformance: ExportPerformanceMock.veryQuick
+      )
+    )
+
+    XCTAssertEqual(persistenceSpanExporter.export(spans: [], explicitTimeout: nil), .failure)
+    XCTAssertTrue(try temporaryDirectory.files().isEmpty)
+  }
+
   private func simpleSpan(tracer: TracerSdk) {
     let span = tracer.spanBuilder(spanName: "SimpleSpan").setSpanKind(spanKind: .client).startSpan()
     span.addEvent(name: "My event", timestamp: Date())

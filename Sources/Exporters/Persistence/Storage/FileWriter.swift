@@ -8,7 +8,7 @@ import Foundation
 protocol FileWriter: Sendable {
   func write(data: Data)
 
-  func writeSync(data: Data)
+  func writeSync(data: Data) throws
 
   func flush()
 }
@@ -27,21 +27,19 @@ final class OrchestratedFileWriter: FileWriter {
 
   func write(data: Data) {
     queue.async { [weak self] in
-      self?.synchronizedWrite(data: data)
+      try? self?.synchronizedWrite(data: data)
     }
   }
 
-  func writeSync(data: Data) {
-    queue.sync { [weak self] in
-      self?.synchronizedWrite(data: data, syncOnEnd: true)
+  func writeSync(data: Data) throws {
+    try queue.sync {
+      try synchronizedWrite(data: data, syncOnEnd: true)
     }
   }
 
-  private func synchronizedWrite(data: Data, syncOnEnd: Bool = false) {
-    do {
-      let file = try orchestrator.getWritableFile(writeSize: UInt64(data.count))
-      try file.append(data: data, synchronized: syncOnEnd)
-    } catch {}
+  private func synchronizedWrite(data: Data, syncOnEnd: Bool = false) throws {
+    let file = try orchestrator.getWritableFile(writeSize: UInt64(data.count))
+    try file.append(data: data, synchronized: syncOnEnd)
   }
 
   func flush() {

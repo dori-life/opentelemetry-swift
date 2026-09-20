@@ -134,12 +134,16 @@ extension DataExportStatus {
 
 final class FileWriterMock: FileWriter, @unchecked Sendable {
   var onWrite: ((Bool, Data) -> Void)? = nil
+  var synchronousWriteError: Error?
 
   func write(data: Data) {
     onWrite?(false, data)
   }
 
-  func writeSync(data: Data) {
+  func writeSync(data: Data) throws {
+    if let synchronousWriteError {
+      throw synchronousWriteError
+    }
     onWrite?(true, data)
   }
 
