@@ -47,6 +47,40 @@ class OrchestratedFileWriterTests: XCTestCase {
     XCTAssertEqual(try temporaryDirectory.files()[0].read(), data)
   }
 
+  func testSynchronousWriteStoresData() throws {
+    let writer = OrchestratedFileWriter(
+      orchestrator: FilesOrchestrator(directory: temporaryDirectory,
+                                      performance: PersistencePerformancePreset.default,
+                                      dateProvider: SystemDateProvider())
+    )
+
+    try writer.writeSync(data: "value".utf8Data)
+
+    XCTAssertEqual(try temporaryDirectory.files().count, 1)
+    XCTAssertEqual(try temporaryDirectory.files()[0].read(), "value".utf8Data)
+  }
+
+  func testWhenSynchronousDataExceedsMaxWriteSize_thenWriteThrowsAndStoresNothing() throws {
+    let writer = OrchestratedFileWriter(
+      orchestrator: FilesOrchestrator(
+        directory: temporaryDirectory,
+        performance: StoragePerformanceMock(
+          maxFileSize: .max,
+          maxDirectorySize: .max,
+          maxFileAgeForWrite: .distantFuture,
+          minFileAgeForRead: .mockAny(),
+          maxFileAgeForRead: .mockAny(),
+          maxObjectsInFile: .max,
+          maxObjectSize: 4
+        ),
+        dateProvider: SystemDateProvider()
+      )
+    )
+
+    XCTAssertThrowsError(try writer.writeSync(data: "value".utf8Data))
+    XCTAssertTrue(try temporaryDirectory.files().isEmpty)
+  }
+
   func testGivenErrorVerbosity_whenIndividualDataExceedsMaxWriteSize_itDropsDataAndPrintsError() throws {
     let expectation1 = expectation(description: "write completed")
     let expectation2 = expectation(description: "second write completed")

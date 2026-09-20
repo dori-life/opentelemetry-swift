@@ -78,6 +78,20 @@ class PersistenceExporterDecoratorTests: XCTestCase {
     try exporter.export(values: ["value"])
   }
 
+  func testWhenSynchronousWriteFails_thenExportThrowsTheWriteError() {
+    var worker = DataExportWorkerMock()
+    let fileWriter = FileWriterMock()
+    fileWriter.synchronousWriteError = ErrorMock("write failed")
+    let exporter: PersistenceExporter<String> = createPersistenceExporter(
+      fileWriter: fileWriter,
+      worker: &worker
+    )
+
+    XCTAssertThrowsError(try exporter.export(values: ["value"])) { error in
+      XCTAssertEqual((error as? ErrorMock)?.description, "write failed")
+    }
+  }
+
   func testWhenValueCannotBeEncoded_itThrowsAnError() {
     // When
     var worker = DataExportWorkerMock()
